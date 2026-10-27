@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>my little sky wall</title>
+  <meta name="description" content="A sunrise & sunset memory wall.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#FAEAF0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#2A2125" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="sky wall">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // apply the saved theme before first paint so there's no flash
+    try { const t = localStorage.getItem('sky-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 22h22M9 22a7 7 0 0 1 14 0M16 6v4M7.5 10.5l2.5 2.5M24.5 10.5 22 13"/></svg>
+      my little sky wall
+    </a>
+    <nav class="filters" aria-label="Filter skies">
+      <button class="chip is-active" type="button" data-filter="all" aria-pressed="true">all skies</button>
+      <button class="chip" type="button" data-filter="sunrise" aria-pressed="false">sunrises</button>
+      <button class="chip" type="button" data-filter="sunset" aria-pressed="false">sunsets</button>
+      <button class="chip" type="button" data-filter="fav" aria-pressed="false">favs</button>
+    </nav>
+    <button class="icon-btn" type="button" id="themeToggle" aria-label="Switch to dark mode">
+      <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+      <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>
+    </button>
+  </header>
+
+  <!-- live sky: follows today's real sunrise / sunset -->
+  <section class="sky" id="sky" data-phase="day" aria-labelledby="skyHeadline">
+    <div class="sky-stars" aria-hidden="true"></div>
+    <div class="sky-stage" aria-hidden="true">
+      <svg class="sky-arc" viewBox="0 0 1000 320" preserveAspectRatio="none">
+        <path d="M40 270 Q500 -50 960 270"/>
+      </svg>
+      <div class="sky-body" id="skyBody"><span class="rays"></span></div>
+    </div>
+    <svg class="cloud c1" viewBox="0 0 120 50" aria-hidden="true"><path d="M20 42a14 14 0 0 1 4-27 20 20 0 0 1 36-6 16 16 0 0 1 28 6 13 13 0 0 1 12 27Z"/></svg>
+    <svg class="cloud c2" viewBox="0 0 120 50" aria-hidden="true"><path d="M20 42a14 14 0 0 1 4-27 20 20 0 0 1 36-6 16 16 0 0 1 28 6 13 13 0 0 1 12 27Z"/></svg>
+    <svg class="cloud c3" viewBox="0 0 120 50" aria-hidden="true"><path d="M20 42a14 14 0 0 1 4-27 20 20 0 0 1 36-6 16 16 0 0 1 28 6 13 13 0 0 1 12 27Z"/></svg>
+    <svg class="hills" viewBox="0 0 1000 120" preserveAspectRatio="none" aria-hidden="true">
+      <path class="hill-back" d="M0 70 C120 20 230 30 340 62 S560 20 700 50 S900 30 1000 55 V120 H0Z"/>
+      <path class="hill-front" d="M0 95 C150 60 260 70 400 92 S640 62 780 85 S930 70 1000 82 V120 H0Z"/>
+    </svg>
+
+    <div class="sky-note">
+      <span class="tape" aria-hidden="true"></span>
+      <p class="sky-kicker" id="skyKicker">today</p>
+      <h1 class="sky-headline" id="skyHeadline">little moments, saved in colour</h1>
+      <p class="sky-sub" id="skySub"></p>
+      <p class="sky-times">
+        <span id="skyRise"></span><span id="skySet"></span>
+        <span class="sky-place"><span id="skyPlace">pune</span> · <button class="link" type="button" id="locateBtn">use my location</button></span>
+      </p>
+      <div class="sky-add">
+        <button class="btn btn-rise" type="button" data-add="sunrise">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 4v5M9.5 6.5 12 4l2.5 2.5"/></svg>
+          add a sunrise
+        </button>
+        <button class="btn btn-set" type="button" data-add="sunset">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 4v5M9.5 6.5 12 9l2.5-2.5"/></svg>
+          add a sunset
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="intro">
+    <ul class="stats">
+      <li class="stat-rise"><b id="statSunrise">0</b> sunrises</li>
+      <li class="stat-set"><b id="statSunset">0</b> sunsets</li>
+      <li><b id="statTotal">0</b> little memories</li>
+    </ul>
+    <button class="btn" type="button" id="randomBtn">✶ random sky</button>
+  </section>
+
+  <main id="wall" class="wall"></main>
+
+  <!-- quick add, shown once the sky scrolls away -->
+  <div class="quick-add" id="quickAdd" aria-label="Quick add">
+    <button class="btn btn-rise" type="button" data-add="sunrise">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 4v5M9.5 6.5 12 4l2.5 2.5"/></svg>
+      sunrise
+    </button>
+    <button class="btn btn-set" type="button" data-add="sunset">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 4v5M9.5 6.5 12 9l2.5-2.5"/></svg>
+      sunset
+    </button>
+  </div>
+
+  <footer class="foot">
+    <p>
+      <button class="link" type="button" id="exportBtn">export backup</button>
+      ·
+      <label class="link">import backup<input type="file" id="importInput" accept="application/json,.json" class="visually-hidden"></label>
+    </p>
+    <p class="foot-note">your skies live on this device only, so export a backup now and then.</p>
+    <p><button class="btn" type="button" id="installBtn" hidden>install as an app</button></p>
+  </footer>
+
+  <!-- add / edit form -->
+  <dialog id="formDialog" class="sheet" aria-labelledby="formTitle">
+    <form id="skyForm" novalidate>
+      <h2 id="formTitle">add a sky</h2>
+
+      <label class="drop" id="dropzone">
+        <input type="file" id="photoInput" accept="image/*" aria-label="Choose a photo">
+        <img id="photoPreview" alt="" hidden>
+        <span class="drop-hint" id="dropHint">choose a photo<small>or drop / paste one here</small></span>
+      </label>
+      <p class="field-error" id="photoError" hidden></p>
+
+      <fieldset class="seg">
+        <legend class="visually-hidden">type</legend>
+        <label><input type="radio" name="type" value="sunrise"><span>sunrise</span></label>
+        <label><input type="radio" name="type" value="sunset"><span>sunset</span></label>
+      </fieldset>
+
+      <div class="row2">
+        <label class="field"><span>date</span><input type="date" name="date" required></label>
+        <label class="field"><span>location <em>optional</em></span><input name="location" maxlength="60" placeholder="pune" autocomplete="off"></label>
+      </div>
+      <label class="field"><span>title <em>optional</em></span><input name="title" maxlength="60" placeholder="the sky went pink" autocomplete="off"></label>
+
+      <fieldset class="moods">
+        <legend>mood <em>optional</em></legend>
+        <div class="mood-list" id="moodList"></div>
+      </fieldset>
+
+      <label class="field"><span>note <em>optional</em></span><input name="note" maxlength="140" placeholder="one line about the moment" autocomplete="off"></label>
+      <label class="check"><input type="checkbox" name="fav"> one to keep (favourite)</label>
+
+      <div class="form-actions">
+        <button type="button" class="btn" data-close>cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">pin it to the wall</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- full memory view -->
+  <dialog id="viewDialog" class="sheet sheet-wide" aria-labelledby="viewTitle">
+    <button type="button" class="close" data-close aria-label="Close">&times;</button>
+    <div class="view">
+      <figure class="view-photo" id="viewFrame">
+        <span class="pin" aria-hidden="true"></span>
+        <div class="photo"><img id="viewImg" alt=""></div>
+      </figure>
+      <div class="view-info">
+        <p class="view-type" id="viewType"></p>
+        <h2 id="viewTitle"></h2>
+        <p class="view-date" id="viewDate"></p>
+        <p class="view-meta" id="viewMeta"></p>
+        <p class="view-note" id="viewNote"></p>
+        <div class="view-palette" id="viewPalette"></div>
+        <div class="view-actions">
+          <button type="button" class="btn" id="viewFav"></button>
+          <button type="button" class="btn" id="viewEdit">edit</button>
+          <button type="button" class="btn btn-quiet" id="viewDelete">delete</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
