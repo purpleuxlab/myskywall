@@ -41,32 +41,71 @@ const MOODS = {
   cloudy: '#E3E1E8',
   dramatic: '#F2B4A6',
 };
-const TILTS = [-3, 2, -1.5, 2.5, -2, 1.5, -2.5, 1];
-const STRING_SVG = '<svg class="string" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M-1 6 Q50 34 101 6"/></svg>';
-const sag = t => 6 + 56 * t * (1 - t); // y of the string path above at fraction t
+const HEART_PATH = 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z';
+const HEART_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${HEART_PATH}"/></svg>`;
 
-const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+// little white line doodles, drawn on a 24×24 grid
+const DOODLES = {
+  hearts: '<path d="M7.4 4.2a2.6 2.6 0 0 0-3.7 0 2.6 2.6 0 0 0 0 3.7L7.4 11.6l3.7-3.7a2.6 2.6 0 0 0-3.7-3.7Z"/><path d="M16 11.4a3.4 3.4 0 0 0-4.8 0 3.4 3.4 0 0 0 0 4.8l4.8 4.8 4.8-4.8a3.4 3.4 0 0 0-4.8-4.8Z"/>',
+  waves: '<path d="M1 13c2.5-3.5 5.5-3.5 8 0s5.5 3.5 8 0 4-2.5 6-1"/><path d="M7 18c2-2.4 4-2.4 6 0s4 2.4 6 0"/>',
+  sparkles: '<path d="M8 2c.6 3.2 1.6 4.2 4.6 4.8C9.6 7.4 8.6 8.4 8 11.6 7.4 8.4 6.4 7.4 3.4 6.8 6.4 6.2 7.4 5.2 8 2Z"/><path d="M17 12c.4 2 1 2.6 2.8 3-1.8.4-2.4 1-2.8 3-.4-2-1-2.6-2.8-3 1.8-.4 2.4-1 2.8-3Z"/>',
+  birds: '<path d="M2 9c2-2.2 4-2.2 5 0 1-2.2 3-2.2 5 0"/><path d="M13 14.5c1.4-1.5 2.8-1.5 3.6 0 .8-1.5 2.2-1.5 3.6 0"/>',
+  rays: '<path d="M3 13 6.5 16"/><path d="M9 5.5l1.2 4.2"/><path d="M17 3.5l-1.2 4.4"/><path d="M22 9.5l-3.4 2.6"/>',
+  shell: '<path d="M12 21 3.2 11.4C4.8 5.6 19.2 5.6 20.8 11.4Z"/><path d="M12 21 7.6 8"/><path d="M12 21V7"/><path d="M12 21l4.4-13"/><path d="M10.4 21h3.2"/>',
+};
+// which doodles go on which corners; each card gets one set
+const DOODLE_SETS = [
+  [['tl', 'hearts'], ['br', 'waves']],
+  [['tr', 'rays'], ['br', 'shell']],
+  [['tl', 'sparkles'], ['tr', 'birds']],
+  [['tr', 'birds'], ['br', 'waves']],
+  [['tl', 'hearts'], ['tr', 'rays']],
+  [['tl', 'sparkles'], ['br', 'shell']],
+];
 
-const BURST = (() => {
-  const pts = [];
-  for (let i = 0; i < 28; i++) {
-    const r = i % 2 ? 25 : 31;
-    const a = (Math.PI * 2 * i) / 28;
-    pts.push(`${(32 + r * Math.cos(a)).toFixed(1)} ${(32 + r * Math.sin(a)).toFixed(1)}`);
-  }
-  return `M${pts.join('L')}Z`;
-})();
-function stickerSvg(type) {
-  const arrow = type === 'sunrise' ? 'M32 25V14M27.5 18.5 32 14l4.5 4.5' : 'M32 14v11M27.5 20.5 32 25l4.5-4.5';
-  return `<svg viewBox="0 0 64 64"><path class="burst" d="${BURST}"/>
-    <path class="sun" d="M23 42a9 9 0 0 1 18 0Z"/>
-    <path class="glyph" d="M18 42h28M${arrow.slice(1)}"/></svg>`;
+// ---------- wobbly hand-drawn frames ----------
+// A rounded rectangle (superellipse) with smooth noise on its edge, so each
+// frame looks sketched by hand. Points live in a 0–100 box.
+function seededRandom(seed) {
+  return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
 }
+function wobblePoints(seed, amp = 1.5) {
+  const rnd = seededRandom(seed * 97 + 13);
+  const ph = [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28];
+  const N = 72, n = 10, pts = [];
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    const c = Math.cos(t), s = Math.sin(t);
+    const wob = amp * (0.55 * Math.sin(3 * t + ph[0]) + 0.3 * Math.sin(7 * t + ph[1]) + 0.18 * Math.sin(13 * t + ph[2]));
+    pts.push([
+      50 + Math.sign(c) * Math.abs(c) ** (2 / n) * (49 + wob * 0.55), // frames are wide, so wobble less across
+      50 + Math.sign(s) * Math.abs(s) ** (2 / n) * (48 + wob * 1.25),
+    ]);
+  }
+  return pts;
+}
+// closed Catmull-Rom curve through the points, as an SVG path
+function smoothPath(pts, scale = 1) {
+  const p = i => pts[(i + pts.length) % pts.length];
+  const f = v => +(v * scale).toFixed(4);
+  let d = `M${f(p(0)[0])} ${f(p(0)[1])}`;
+  for (let i = 0; i < pts.length; i++) {
+    const [p0, p1, p2, p3] = [p(i - 1), p(i), p(i + 1), p(i + 2)];
+    d += `C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)} `
+      + `${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`;
+  }
+  return d + 'Z';
+}
+const FRAME_VARIANTS = 6;
+const framePaths = Array.from({ length: FRAME_VARIANTS }, (_, i) => wobblePoints(i + 1));
+document.getElementById('clipDefs').innerHTML = framePaths
+  .map((pts, i) => `<clipPath id="wob${i}" clipPathUnits="objectBoundingBox"><path d="${smoothPath(pts, 0.01)}"/></clipPath>`)
+  .join('');
 
 // ---------- state ----------
 let skies = [];
 let filter = 'all';
-let columns = 0;
+let firstRender = true;
 let justAddedId = null;
 const photoUrls = new Map(); // id -> { blob, url }
 
@@ -137,38 +176,64 @@ function visibleSkies() {
   if (filter === 'fav') return skies.filter(s => s.fav);
   return skies.filter(s => s.type === filter);
 }
-function columnCount() {
-  const w = wall.clientWidth;
-  return w >= 860 ? 3 : w >= 520 ? 2 : 1;
-}
-
 function render() {
-  columns = columnCount();
-  $('#statSunrise').textContent = skies.filter(s => s.type === 'sunrise').length;
-  $('#statSunset').textContent = skies.filter(s => s.type === 'sunset').length;
-  $('#statTotal').textContent = skies.length;
+  const rises = skies.filter(s => s.type === 'sunrise').length;
+  const sets = skies.length - rises;
+  $('#stats').textContent = `${rises} ${rises === 1 ? 'sunrise' : 'sunrises'} · ${sets} ${sets === 1 ? 'sunset' : 'sunsets'} · ${skies.length} kept`;
   $('#randomBtn').disabled = skies.length === 0;
 
   const list = visibleSkies();
+  setBackdrop(list[0] || skies[0]);
   wall.replaceChildren();
+  wall.classList.toggle('first-draw', firstRender);
   if (!list.length) {
-    wall.append(makeLine([emptyCard()], 1));
+    const box = document.createElement('div');
+    box.className = 'frames single';
+    box.append(emptyCard());
+    wall.append(box);
   } else {
-    // one labelled group per month, each hung on its own strings
+    // one labelled group per month
     const months = new Map();
     list.forEach(sky => {
       const key = sky.date.slice(0, 7);
       if (!months.has(key)) months.set(key, []);
       months.get(key).push(sky);
     });
+    let index = 0;
     months.forEach((group, key) => {
       wall.append(monthLabel(key, group.length));
-      for (let i = 0; i < group.length; i += columns) {
-        wall.append(makeLine(group.slice(i, i + columns).map(makeCard)));
-      }
+      const box = document.createElement('div');
+      box.className = 'frames';
+      group.forEach(sky => box.append(makeCard(sky, index++)));
+      wall.append(box);
     });
   }
+  firstRender = false;
   justAddedId = null;
+}
+
+// the page background is the latest sky, blurred
+let backdropId = null;
+function setBackdrop(sky) {
+  const el = $('#backdrop');
+  if (!sky) { backdropId = null; el.style.backgroundImage = ''; return; }
+  if (sky.id === backdropId && el.style.backgroundImage) return;
+  backdropId = sky.id;
+  el.style.backgroundImage = `url("${photoUrl(sky)}")`;
+}
+
+// photo + wobbly clip + sketched outline + doodles; shared by cards and the full view
+function frameParts(seed, doodles = true) {
+  const v = seed % FRAME_VARIANTS;
+  const outline = smoothPath(framePaths[v]);
+  const set = DOODLE_SETS[seed % DOODLE_SETS.length];
+  return {
+    clip: `url(#wob${v})`,
+    html: `<svg class="sketch" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path d="${outline}"/></svg>`
+      + (doodles ? set.map(([corner, name]) =>
+        `<span class="doodle ${corner}" aria-hidden="true"><svg viewBox="0 0 24 24">${DOODLES[name]}</svg></span>`).join('') : ''),
+  };
 }
 
 function monthLabel(key, count) {
@@ -193,42 +258,35 @@ function paletteEl(colors, className) {
   return el;
 }
 
-function makeLine(cards, cols = columns) {
-  const row = document.createElement('div');
-  row.className = 'line';
-  row.style.setProperty('--cols', cols);
-  row.innerHTML = STRING_SVG;
-  cards.forEach((card, i) => {
-    card.style.setProperty('--drop', `${sag((i + 0.5) / cols)}px`);
-    row.append(card);
-  });
-  return row;
-}
-
-function makeCard(sky) {
+function makeCard(sky, index) {
+  const seed = hash(sky.id);
+  const frame = frameParts(seed);
   const el = document.createElement('article');
-  el.className = 'polaroid' + (sky.id === justAddedId ? ' is-new' : '');
+  el.className = 'sky-card' + (sky.id === justAddedId ? ' is-new' : '');
   el.dataset.id = sky.id;
-  el.style.setProperty('--tilt', `${TILTS[hash(sky.id) % TILTS.length]}deg`);
-  el.style.setProperty('--frame', MOODS[sky.mood] || MOODS.plain);
+  el.style.setProperty('--delay', `${Math.min(index * 0.08, 0.8)}s`);
   el.innerHTML = `
-    <span class="pin" aria-hidden="true"></span>
-    <button class="polaroid-open" type="button">
-      <span class="photo"><img loading="lazy" decoding="async"></span>
-      <span class="caption"><span class="cap-title"></span><span class="cap-meta"></span></span>
+    <button class="sky-open" type="button">
+      <span class="shot"><img loading="lazy" decoding="async"></span>
+      ${frame.html}
+      <span class="words"></span>
+      <span class="when"></span>
     </button>
-    <button class="heart" type="button">${HEART_SVG}</button>
-    <span class="sticker ${sky.type}" aria-hidden="true">${stickerSvg(sky.type)}</span>`;
+    <button class="heart" type="button">${HEART_SVG}</button>`;
 
   const title = displayTitle(sky);
+  const shot = el.querySelector('.shot');
+  shot.style.clipPath = frame.clip;
   const img = el.querySelector('img');
   img.src = photoUrl(sky);
   img.alt = `${sky.type}: ${title}`;
-  el.querySelector('.cap-title').textContent = title;
-  el.querySelector('.cap-meta').textContent =
-    [shortDate(sky.date), sky.title ? sky.location : ''].filter(Boolean).join(' · ');
-  if (sky.palette) el.querySelector('.caption').append(paletteEl(sky.palette, 'palette'));
-  el.querySelector('.polaroid-open').addEventListener('click', () => openView(sky.id));
+  const words = el.querySelector('.words');
+  words.textContent = `${title} ♡`;
+  words.style.setProperty('--wx', `${10 + (seed % 5) * 3}%`);
+  words.style.setProperty('--wy', `${30 + (seed % 4) * 5}%`);
+  el.querySelector('.when').textContent =
+    [shortDate(sky.date), sky.type, sky.title ? sky.location : ''].filter(Boolean).join(' · ');
+  el.querySelector('.sky-open').addEventListener('click', () => openView(sky.id));
 
   const heart = el.querySelector('.heart');
   heart.setAttribute('aria-pressed', String(!!sky.fav));
@@ -244,37 +302,32 @@ function emptyCard() {
     sunset: 'no sunsets yet. the next golden hour is yours.',
     fav: 'no favourites yet. tap a heart on a sky you love.',
   };
+  const frame = frameParts(2);
   const el = document.createElement('article');
-  el.className = 'polaroid empty';
-  el.style.setProperty('--tilt', '-2deg');
+  el.className = 'sky-card empty';
   el.innerHTML = `
-    <span class="pin" aria-hidden="true"></span>
-    <div class="polaroid-open">
-      <span class="photo"><span class="msg"></span></span>
-      <span class="caption"><span class="cap-title">&nbsp;</span></span>
+    <div class="sky-open">
+      <span class="shot"><span class="msg"></span></span>
+      ${frame.html}
     </div>`;
-  el.querySelector('.msg').textContent = messages[filter];
+  el.querySelector('.shot').style.clipPath = frame.clip;
+  el.querySelector('.msg').textContent = `${messages[filter]} ♡`;
   const types = filter === 'all' ? ['sunrise', 'sunset'] : filter === 'fav' ? [] : [filter];
   if (types.length) {
     const row = document.createElement('span');
-    row.className = 'sky-add';
+    row.className = 'add-row';
     types.forEach(type => {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = `btn btn-${type === 'sunrise' ? 'rise' : 'set'}`;
+      btn.className = 'glass-btn';
       btn.textContent = `+ ${type}`;
       btn.addEventListener('click', () => openForm(null, type));
       row.append(btn);
     });
-    el.querySelector('.photo').append(row);
-    el.querySelector('.cap-title').textContent = 'soon';
+    el.querySelector('.shot').append(row);
   }
   return el;
 }
-
-new ResizeObserver(() => {
-  if (columnCount() !== columns) render();
-}).observe(wall);
 
 // ---------- filters ----------
 document.querySelectorAll('.chip').forEach(chip => {
@@ -284,7 +337,6 @@ document.querySelectorAll('.chip').forEach(chip => {
       c.classList.toggle('is-active', c === chip);
       c.setAttribute('aria-pressed', String(c === chip));
     });
-    document.body.dataset.filter = filter;
     render();
   });
 });
@@ -457,7 +509,7 @@ form.addEventListener('submit', async e => {
   formDialog.close();
   render();
   if ($('#viewDialog').open) fillView(sky);
-  toast(existing ? 'sky updated' : 'pinned to the wall ✿');
+  toast(existing ? 'sky updated ♡' : 'saved to your sky wall ♡');
 });
 
 formDialog.addEventListener('close', () => setPreview(null));
@@ -468,16 +520,19 @@ let viewingId = null;
 
 function fillView(sky) {
   viewingId = sky.id;
-  $('#viewFrame').style.setProperty('--frame', MOODS[sky.mood] || MOODS.plain);
-  $('#viewImg').src = photoUrl(sky);
-  $('#viewImg').alt = `${sky.type}: ${displayTitle(sky)}`;
-  $('#viewType').textContent = sky.type === 'sunrise' ? '☀ sunrise' : '☾ sunset';
+  const frame = frameParts(hash(sky.id));
+  const fig = $('#viewFrame');
+  fig.innerHTML = `<span class="shot"><img></span>${frame.html}`;
+  fig.querySelector('.shot').style.clipPath = frame.clip;
+  const img = fig.querySelector('img');
+  img.src = photoUrl(sky);
+  img.alt = `${sky.type}: ${displayTitle(sky)}`;
+  $('#viewType').textContent = `${sky.type === 'sunrise' ? '☀ sunrise' : '☾ sunset'} · ${longDate(sky.date)}`;
   $('#viewTitle').textContent = displayTitle(sky);
-  $('#viewDate').textContent = longDate(sky.date);
   $('#viewMeta').textContent = [sky.location, sky.mood && `${sky.mood} sky`].filter(Boolean).join(' · ');
   $('#viewNote').textContent = sky.note ? `“${sky.note}”` : '';
   $('#viewPalette').replaceChildren(...paletteEl(sky.palette, '').children);
-  $('#viewFav').textContent = sky.fav ? '♥ a keeper' : '♡ favourite';
+  $('#viewFav').textContent = sky.fav ? '♥ kept' : '♡ keep this one';
   $('#viewFav').setAttribute('aria-pressed', String(!!sky.fav));
 }
 
@@ -520,26 +575,6 @@ $('#randomBtn').addEventListener('click', () => {
   }
   openView(pick.id);
 });
-
-// theme
-function isDark() {
-  const t = document.documentElement.dataset.theme;
-  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-}
-function syncThemeLabel() {
-  $('#themeToggle').setAttribute('aria-label', isDark() ? 'Switch to light mode' : 'Switch to dark mode');
-  // match the phone's status bar to the chosen theme
-  document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
-    m.content = isDark() ? '#2A2125' : '#FAEAF0';
-  });
-}
-$('#themeToggle').addEventListener('click', () => {
-  const next = isDark() ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  try { localStorage.setItem('sky-theme', next); } catch (e) {}
-  syncThemeLabel();
-});
-syncThemeLabel();
 
 // ---------- backup ----------
 function blobToDataUrl(blob) {
@@ -731,53 +766,26 @@ function updateSky() {
   if (!today) return; // polar regions: leave the sky as it is
 
   const { rise, set } = today;
-  let phase, kicker, headline, sub, t, moon = false;
-
-  // t = position along the arc (0 = left horizon, 1 = right); the moon takes the night arc
+  let line;
   if (now < rise) {
-    if (rise - now <= 45 * MIN) {
-      phase = 'dawn'; kicker = 'the sky is waking up'; headline = `sunrise in ${fmtIn(rise - now)}`; sub = 'go find a window ☀';
-      t = -0.03;
-    } else {
-      const prevSet = at(-1).set;
-      phase = 'night'; kicker = 'night owl hours'; headline = `sunrise in ${fmtIn(rise - now)}`; sub = `at ${fmtTime(rise)}`;
-      t = (now - prevSet) / (rise - prevSet); moon = true;
-    }
+    line = rise - now <= 45 * MIN
+      ? `the sky is waking up, sunrise in ${fmtIn(rise - now)}`
+      : `sunrise in ${fmtIn(rise - now)}`;
   } else if (now < set) {
-    t = (now - rise) / (set - rise);
-    if (now - rise <= 60 * MIN) {
-      phase = 'dawn'; kicker = 'morning glow'; headline = 'the sun just rose'; sub = `at ${fmtTime(rise)}. still pink out there?`;
-    } else if (set - now <= 60 * MIN) {
-      phase = 'golden'; kicker = 'golden hour ✶'; headline = `sunset in ${fmtIn(set - now)}`; sub = 'go look up.';
-    } else {
-      phase = 'day'; kicker = 'today'; headline = `sunset in ${fmtIn(set - now)}`; sub = `at ${fmtTime(set)}`;
-    }
+    if (now - rise <= 60 * MIN) line = 'the sun just rose ☀';
+    else if (set - now <= 60 * MIN) line = `golden hour, sunset in ${fmtIn(set - now)} ✧`;
+    else line = `sunset in ${fmtIn(set - now)}`;
   } else {
     const nextRise = at(1).rise;
-    if (now - set <= 45 * MIN) {
-      phase = 'dusk'; kicker = 'afterglow'; headline = 'the sun just set'; sub = `at ${fmtTime(set)}. the sky's still glowing`;
-      t = 1.03;
-    } else {
-      phase = 'night'; kicker = 'goodnight, sun'; headline = `sunrise in ${fmtIn(nextRise - now)}`; sub = `tomorrow at ${fmtTime(nextRise)}`;
-      t = (now - set) / (nextRise - set); moon = true;
-    }
+    line = now - set <= 45 * MIN
+      ? 'the sun just set, look up ♡'
+      : `goodnight, sun. sunrise in ${fmtIn(nextRise - now)}`;
   }
 
-  $('#sky').dataset.phase = phase;
-  $('#skyKicker').textContent = kicker;
-  $('#skyHeadline').textContent = headline;
-  $('#skySub').textContent = sub;
-  $('#skyRise').textContent = `☀ ${fmtTime(rise)}`;
-  $('#skySet').textContent = `☾ ${fmtTime(set)}`;
-  $('#skyPlace').textContent = place.name;
-
-  const body = $('#skyBody');
-  body.classList.toggle('is-moon', moon);
-  const k = Math.min(1.05, Math.max(-0.05, t));
-  const x = (1 - k) ** 2 * 40 + 2 * k * (1 - k) * 500 + k ** 2 * 960;
-  const y = (1 - k) ** 2 * 270 + 2 * k * (1 - k) * -50 + k ** 2 * 270;
-  body.style.left = `${x / 10}%`;
-  body.style.top = `${(y / 320) * 100}%`;
+  $('#todayLine').textContent = line;
+  $('#todayRise').textContent = `☀ ${fmtTime(rise)}`;
+  $('#todaySet').textContent = `☾ ${fmtTime(set)}`;
+  $('#todayPlace').textContent = place.name;
 }
 
 $('#locateBtn').addEventListener('click', () => {
@@ -802,7 +810,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) upda
 // quick-add bar appears once the sky's add buttons have scrolled up out of view
 new IntersectionObserver(([entry]) => {
   $('#quickAdd').classList.toggle('show', !entry.isIntersecting && entry.boundingClientRect.top < 0);
-}).observe($('.sky-add'));
+}).observe($('#addRow'));
 
 // ---------- start ----------
 db.all()
