@@ -370,6 +370,7 @@ $('#moodList').innerHTML = Object.entries(MOODS)
 
 let editingId = null;
 let pendingPhoto = null;
+let originalPhoto = null; // the photo before cropping, so a re-crop starts from the full image
 let previewUrl = null;
 let touched = { date: false, type: false };
 
@@ -390,6 +391,10 @@ function setPreview(src, ownsUrl = false) {
   $('#dropHint').firstChild.textContent = 'change photo';
 }
 
+function showCropButton(show) {
+  $('#cropAgain').hidden = !show;
+}
+
 function showPhotoError(msg) {
   photoError.textContent = msg;
   photoError.hidden = !msg;
@@ -402,6 +407,7 @@ function usePhoto(file) {
   }
   showPhotoError('');
   pendingPhoto = file;
+  originalPhoto = file;
   setPreview(URL.createObjectURL(file), true);
 
   // guess date + sunrise/sunset from the file, unless already chosen
@@ -411,6 +417,8 @@ function usePhoto(file) {
     if (!touched.type) form.type.value = taken.getHours() < 12 ? 'sunrise' : 'sunset';
     syncFormTitle();
   }
+  // straight into crop & adjust; if the browser can't read the photo, it's used as picked
+  openCrop(file).then(ok => showCropButton(ok));
 }
 
 function syncFormTitle() {
@@ -441,6 +449,8 @@ form.querySelectorAll('input[name="type"]').forEach(r => r.addEventListener('cha
 function openForm(id = null, type = null) {
   editingId = id;
   pendingPhoto = null;
+  originalPhoto = null;
+  crop = null;
   touched = { date: false, type: false };
   form.reset();
   photoInput.value = '';
@@ -456,8 +466,11 @@ function openForm(id = null, type = null) {
     form.mood.value = sky.mood || 'plain';
     form.fav.checked = !!sky.fav;
     setPreview(photoUrl(sky));
+    originalPhoto = sky.photo;
+    showCropButton(true);
   } else {
     setPreview(null);
+    showCropButton(false);
     form.type.value = type || (new Date().getHours() < 12 ? 'sunrise' : 'sunset');
     touched.type = !!type;
     form.date.value = todayIso();
@@ -513,6 +526,168 @@ form.addEventListener('submit', async e => {
 });
 
 formDialog.addEventListener('close', () => setPreview(null));
+
+// ---------- crop & adjust ----------
+const FRAME_RATIO = 3 / 2;   // keep in step with --frame-ratio in style.css
+const MAX_SIDE = 2400;       // saved photos are at most this many px on the long side
+const NO_ADJUST = { bright: 0, warmth: 0, contrast: 0, sat: 0 };
+const cropDialog = $('#cropDialog');
+const cropStage = $('#cropStage');
+const cropCanvas = $('#cropCanvas');
+const cropZoom = $('#cropZoom');
+// { file, img, view (smaller copy for dragging), rot, zoom, cx, cy (centre, 0–1), ratio, adj }
+let crop = null;
+
+async function openCrop(file) {
+  if (!crop || crop.file !== file) {
+    let img;
+    try { img = await createImageBitmap(file); } catch (err) { return false; }
+    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const view = scale < 1
+      ? await createImageBitmap(img, { resizeWidth: Math.round(img.width * scale), resizeHeight: Math.round(img.height * scale), resizeQuality: 'medium' })
+      : img;
+    crop = { file, img, view, rot: 0, zoom: 1, cx: .5, cy: .5, ratio: 'frame', adj: { ...NO_ADJUST } };
+  }
+  syncCropControls();
+  cropDialog.showModal();
+  drawCrop();
+  return true;
+}
+
+// the crop box in the (rotated) photo's own pixels
+function cropBox(src) {
+  const turned = crop.rot % 2 === 1;
+  const rw = turned ? src.height : src.width;
+  const rh = turned ? src.width : src.height;
+  const ratio = crop.ratio === 'frame' ? FRAME_RATIO : rw / rh;
+  let cw, ch;
+  if (rw / rh > ratio) { ch = rh / crop.zoom; cw = ch * ratio; }
+  else { cw = rw / crop.zoom; ch = cw / ratio; }
+  // keep the box inside the photo
+  crop.cx = Math.min(1 - cw / rw / 2, Math.max(cw / rw / 2, crop.cx));
+  crop.cy = Math.min(1 - ch / rh / 2, Math.max(ch / rh / 2, crop.cy));
+  return { rw, rh, cw, ch, ratio, x: crop.cx * rw - cw / 2, y: crop.cy * rh - ch / 2 };
+}
+
+function paintCrop(canvas, src, outW) {
+  const b = cropBox(src);
+  const outH = Math.round(outW / b.ratio);
+  canvas.width = outW;
+  canvas.height = outH;
+  const g = canvas.getContext('2d');
+  const { bright, warmth, contrast, sat } = crop.adj;
+  const s = outW / b.cw;
+  g.save();
+  g.filter = `brightness(${1 + bright / 100}) contrast(${1 + contrast / 100}) saturate(${1 + sat / 100})`;
+  g.scale(s, s);
+  g.translate(b.rw / 2 - b.x, b.rh / 2 - b.y);
+  g.rotate(crop.rot * Math.PI / 2);
+  g.drawImage(src, -src.width / 2, -src.height / 2);
+  g.restore();
+  if (warmth) {
+    // a golden or blue wash, the way warmth works in photo apps
+    g.globalCompositeOperation = 'soft-light';
+    g.fillStyle = warmth > 0 ? `rgba(255, 140, 40, ${warmth / 80})` : `rgba(70, 130, 255, ${-warmth / 80})`;
+    g.fillRect(0, 0, outW, outH);
+    g.globalCompositeOperation = 'source-over';
+  }
+  return b;
+}
+
+let drawQueued = false;
+function drawCrop() {
+  if (drawQueued) return;
+  drawQueued = true;
+  requestAnimationFrame(() => {
+    drawQueued = false;
+    if (!crop) return;
+    const b = cropBox(crop.view);
+    const maxW = cropDialog.querySelector('h2').clientWidth;
+    const maxH = Math.min(innerHeight * .42, 420);
+    const w = Math.min(maxW, maxH * b.ratio);
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    paintCrop(cropCanvas, crop.view, Math.round(w * dpr));
+    cropCanvas.style.width = `${Math.round(w)}px`;
+  });
+}
+
+function syncCropControls() {
+  cropDialog.querySelector(`input[name="ratio"][value="${crop.ratio}"]`).checked = true;
+  cropZoom.value = crop.zoom;
+  cropDialog.querySelectorAll('[data-adj]').forEach(input => { input.value = crop.adj[input.dataset.adj]; });
+}
+
+function setZoom(z) {
+  crop.zoom = Math.min(4, Math.max(1, z));
+  cropZoom.value = crop.zoom;
+  drawCrop();
+}
+
+// drag to move, two fingers to pinch, wheel to zoom
+const pointers = new Map();
+let pinch = null;
+const pinchGap = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+cropStage.addEventListener('pointerdown', e => {
+  cropStage.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) pinch = { gap: pinchGap(), zoom: crop.zoom };
+  cropStage.classList.add('is-moving');
+});
+cropStage.addEventListener('pointermove', e => {
+  const last = pointers.get(e.pointerId);
+  if (!last || !crop) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && pointers.size === 2) { setZoom(pinch.zoom * pinchGap() / pinch.gap); return; }
+  const b = cropBox(crop.view);
+  const perPx = b.cw / cropCanvas.clientWidth;
+  crop.cx -= (e.clientX - last.x) * perPx / b.rw;
+  crop.cy -= (e.clientY - last.y) * perPx / b.rh;
+  drawCrop();
+});
+['pointerup', 'pointercancel'].forEach(ev => cropStage.addEventListener(ev, e => {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) pinch = null;
+  if (!pointers.size) cropStage.classList.remove('is-moving');
+}));
+cropStage.addEventListener('wheel', e => {
+  e.preventDefault();
+  setZoom(crop.zoom * Math.exp(-e.deltaY * 0.0015));
+}, { passive: false });
+
+cropZoom.addEventListener('input', () => setZoom(Number(cropZoom.value)));
+cropDialog.querySelectorAll('input[name="ratio"]').forEach(r => r.addEventListener('change', () => {
+  crop.ratio = r.value;
+  drawCrop();
+}));
+cropDialog.querySelectorAll('[data-adj]').forEach(input => input.addEventListener('input', () => {
+  crop.adj[input.dataset.adj] = Number(input.value);
+  drawCrop();
+}));
+$('#cropRotate').addEventListener('click', () => {
+  crop.rot = (crop.rot + 1) % 4;
+  drawCrop();
+});
+$('#cropReset').addEventListener('click', () => {
+  Object.assign(crop, { rot: 0, zoom: 1, cx: .5, cy: .5, ratio: 'frame', adj: { ...NO_ADJUST } });
+  syncCropControls();
+  drawCrop();
+});
+$('#cropSkip').addEventListener('click', () => cropDialog.close());
+$('#cropDone').addEventListener('click', async () => {
+  const b = cropBox(crop.img);
+  const outW = Math.round(Math.min(b.cw, b.ratio >= 1 ? MAX_SIDE : MAX_SIDE * b.ratio));
+  const out = document.createElement('canvas');
+  paintCrop(out, crop.img, outW);
+  const blob = await new Promise(resolve => out.toBlob(resolve, 'image/jpeg', 0.9));
+  if (blob) {
+    pendingPhoto = blob;
+    setPreview(URL.createObjectURL(blob), true);
+  }
+  cropDialog.close();
+});
+$('#cropAgain').addEventListener('click', () => {
+  if (originalPhoto) openCrop(originalPhoto);
+});
 
 // ---------- view / edit / delete ----------
 const viewDialog = $('#viewDialog');
@@ -813,10 +988,21 @@ new IntersectionObserver(([entry]) => {
 }).observe($('#addRow'));
 
 // ---------- start ----------
+// the opening screen stays at least this long, so it reads as a moment, not a flash
+const SPLASH_MS = 1800;
+const splash = $('#splash');
+const splashShown = Date.now();
+function hideSplash() {
+  splash.classList.add('is-gone');
+  setTimeout(() => splash.remove(), 800);
+}
+splash.addEventListener('click', hideSplash);
+
 db.all()
   .then(list => { skies = list; sortSkies(); render(); if (list.length) keepStorage(); backfillPalettes(); })
   .catch(err => {
     console.error(err);
     render();
     toast('this browser is blocking storage, so skies won’t be saved');
-  });
+  })
+  .finally(() => setTimeout(hideSplash, Math.max(0, SPLASH_MS - (Date.now() - splashShown))));

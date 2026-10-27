@@ -19,6 +19,13 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- opening screen, shown for a moment while the wall loads -->
+  <div class="splash" id="splash" aria-hidden="true">
+    <img class="splash-icon" src="icons/icon-512.png" alt="" width="128" height="128">
+    <p class="splash-name">my little sky wall <span>♡</span></p>
+    <p class="splash-line">collecting your beautiful<br>sunsets &amp; sunrises</p>
+  </div>
+
   <!-- the blurred sky behind everything: your latest photo, or a painted sunset -->
   <div class="backdrop" aria-hidden="true"><div class="backdrop-img" id="backdrop"></div></div>
 
@@ -85,6 +92,7 @@
         <img id="photoPreview" alt="" hidden>
         <span class="drop-hint" id="dropHint">choose a photo<small>or drop / paste one here</small></span>
       </label>
+      <p class="photo-tools"><button type="button" class="link" id="cropAgain" hidden>✂ crop &amp; adjust</button></p>
       <p class="field-error" id="photoError" hidden></p>
 
       <fieldset class="seg">
@@ -112,6 +120,39 @@
         <button type="submit" class="glass-btn solid">save this sky</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- crop & adjust, opens right after a photo is chosen -->
+  <dialog id="cropDialog" class="sheet crop-sheet" aria-labelledby="cropTitle">
+    <h2 id="cropTitle">crop &amp; adjust</h2>
+    <div class="crop-stage" id="cropStage">
+      <canvas id="cropCanvas" aria-label="Photo crop preview"></canvas>
+      <span class="crop-grid" aria-hidden="true"></span>
+    </div>
+    <p class="crop-hint">drag to move · pinch or scroll to zoom</p>
+
+    <div class="crop-tools">
+      <fieldset class="seg crop-ratio">
+        <legend class="visually-hidden">shape</legend>
+        <label><input type="radio" name="ratio" value="frame" checked><span>wall frame</span></label>
+        <label><input type="radio" name="ratio" value="original"><span>whole photo</span></label>
+      </fieldset>
+      <button type="button" class="glass-btn" id="cropRotate" aria-label="Rotate a quarter turn">↻</button>
+    </div>
+
+    <div class="sliders">
+      <label class="slider"><span>zoom</span><input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1"></label>
+      <label class="slider"><span>brightness</span><input type="range" data-adj="bright" min="-50" max="50" value="0"></label>
+      <label class="slider"><span>warmth</span><input type="range" data-adj="warmth" min="-50" max="50" value="0"></label>
+      <label class="slider"><span>contrast</span><input type="range" data-adj="contrast" min="-50" max="50" value="0"></label>
+      <label class="slider"><span>colour</span><input type="range" data-adj="sat" min="-50" max="50" value="0"></label>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="link crop-reset" id="cropReset">reset</button>
+      <button type="button" class="glass-btn" id="cropSkip">use as is</button>
+      <button type="button" class="glass-btn solid" id="cropDone">done</button>
+    </div>
   </dialog>
 
   <!-- full memory view -->
