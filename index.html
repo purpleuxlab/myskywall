@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>my little sky wall</title>
-  <meta name="description" content="A sunrise & sunset memory wall.">
+  <meta name="description" content="A sunrise, sunset & moon memory wall.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -39,6 +39,7 @@
       <button class="chip is-active" type="button" data-filter="all" aria-pressed="true">all skies</button>
       <button class="chip" type="button" data-filter="sunrise" aria-pressed="false">sunrises</button>
       <button class="chip" type="button" data-filter="sunset" aria-pressed="false">sunsets</button>
+      <button class="chip" type="button" data-filter="moon" aria-pressed="false">moons</button>
       <button class="chip" type="button" data-filter="fav" aria-pressed="false">kept ♡</button>
     </nav>
   </header>
@@ -54,8 +55,9 @@
       <button class="link" type="button" id="locateBtn">use my location</button>
     </p>
     <div class="add-row" id="addRow">
-      <button class="glass-btn" type="button" data-add="sunrise">+ add a sunrise</button>
-      <button class="glass-btn" type="button" data-add="sunset">+ add a sunset</button>
+      <button class="glass-btn" type="button" data-add="sunrise">+ <span class="wide-only">add a </span>sunrise</button>
+      <button class="glass-btn" type="button" data-add="sunset">+ <span class="wide-only">add a </span>sunset</button>
+      <button class="glass-btn" type="button" data-add="moon">+ <span class="wide-only">add a </span>moon</button>
     </div>
   </section>
 
@@ -70,6 +72,7 @@
   <div class="quick-add" id="quickAdd" aria-label="Quick add">
     <button class="glass-btn" type="button" data-add="sunrise">+ sunrise</button>
     <button class="glass-btn" type="button" data-add="sunset">+ sunset</button>
+    <button class="glass-btn" type="button" data-add="moon">+ moon</button>
   </div>
 
   <footer class="foot">
@@ -95,10 +98,11 @@
       <p class="photo-tools"><button type="button" class="link" id="cropAgain" hidden>✂ crop &amp; adjust</button></p>
       <p class="field-error" id="photoError" hidden></p>
 
-      <fieldset class="seg">
+      <fieldset class="seg seg-3">
         <legend class="visually-hidden">type</legend>
         <label><input type="radio" name="type" value="sunrise"><span>☀ sunrise</span></label>
-        <label><input type="radio" name="type" value="sunset"><span>☾ sunset</span></label>
+        <label><input type="radio" name="type" value="sunset"><span>◓ sunset</span></label>
+        <label><input type="radio" name="type" value="moon"><span>☾ moon</span></label>
       </fieldset>
 
       <label class="field"><span>a few words <em>shown on the photo</em></span><input name="title" maxlength="40" placeholder="good things take time" autocomplete="off"></label>

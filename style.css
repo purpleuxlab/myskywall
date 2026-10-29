@@ -459,6 +459,7 @@ label.link:focus-within { outline: 1.5px dashed var(--white); outline-offset: 4p
 
 fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.seg.seg-3 { grid-template-columns: repeat(3, 1fr); }
 .seg label { position: relative; }
 .seg input { position: absolute; opacity: 0; }
 .seg span {
@@ -545,10 +546,11 @@ em { font-style: normal; font-weight: 400; letter-spacing: .08em; color: var(--w
   .frames { grid-template-columns: minmax(0, 1fr); gap: 40px; max-width: 620px; margin: 0 auto; }
 }
 @media (max-width: 480px) {
-  .chip { font-size: 18px; letter-spacing: .06em; }
-  .filters { gap: 4px 16px; }
+  .chip { font-size: 17px; letter-spacing: .04em; }
+  .filters { gap: 4px 14px; }
   .today { padding-top: 26px; }
   .add-row .glass-btn { flex: 1; padding: 10px 12px; }
+  .add-row .wide-only { display: none; }
   .words { max-width: 64%; font-size: 15px; letter-spacing: .12em; }
   .doodle { width: 32px; height: 32px; }
   .doodle.br { width: 40px; }

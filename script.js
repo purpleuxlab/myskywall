@@ -32,6 +32,15 @@ const db = {
 };
 
 // ---------- constants ----------
+// the kinds of sky you can keep
+const TYPES = ['sunrise', 'sunset', 'moon'];
+const TYPE_ICONS = { sunrise: '☀', sunset: '◓', moon: '☾' };
+// morning photos are sunrises, evening ones sunsets, late night ones moons
+function guessType(date) {
+  const h = date.getHours();
+  return h >= 20 || h < 4 ? 'moon' : h < 12 ? 'sunrise' : 'sunset';
+}
+
 const MOODS = {
   plain: '#ECE7FA',
   golden: '#F8E2A6',
@@ -177,9 +186,11 @@ function visibleSkies() {
   return skies.filter(s => s.type === filter);
 }
 function render() {
-  const rises = skies.filter(s => s.type === 'sunrise').length;
-  const sets = skies.length - rises;
-  $('#stats').textContent = `${rises} ${rises === 1 ? 'sunrise' : 'sunrises'} · ${sets} ${sets === 1 ? 'sunset' : 'sunsets'} · ${skies.length} kept`;
+  const count = type => skies.filter(s => s.type === type).length;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const moons = count('moon');
+  $('#stats').textContent = [plural(count('sunrise'), 'sunrise'), plural(count('sunset'), 'sunset'),
+    moons ? plural(moons, 'moon') : '', `${skies.length} kept`].filter(Boolean).join(' · ');
   $('#randomBtn').disabled = skies.length === 0;
 
   const list = visibleSkies();
@@ -300,6 +311,7 @@ function emptyCard() {
     all: 'your wall is waiting for its first sky.',
     sunrise: 'no sunrises yet. one early morning, maybe?',
     sunset: 'no sunsets yet. the next golden hour is yours.',
+    moon: 'no moons yet. look up tonight.',
     fav: 'no favourites yet. tap a heart on a sky you love.',
   };
   const frame = frameParts(2);
@@ -312,7 +324,7 @@ function emptyCard() {
     </div>`;
   el.querySelector('.shot').style.clipPath = frame.clip;
   el.querySelector('.msg').textContent = `${messages[filter]} ♡`;
-  const types = filter === 'all' ? ['sunrise', 'sunset'] : filter === 'fav' ? [] : [filter];
+  const types = filter === 'all' ? TYPES : filter === 'fav' ? [] : [filter];
   if (types.length) {
     const row = document.createElement('span');
     row.className = 'add-row';
@@ -414,7 +426,7 @@ function usePhoto(file) {
   if (file.lastModified && !editingId) {
     const taken = new Date(file.lastModified);
     if (!touched.date) form.date.value = todayIso(taken);
-    if (!touched.type) form.type.value = taken.getHours() < 12 ? 'sunrise' : 'sunset';
+    if (!touched.type) form.type.value = guessType(taken);
     syncFormTitle();
   }
   // straight into crop & adjust; if the browser can't read the photo, it's used as picked
@@ -471,7 +483,7 @@ function openForm(id = null, type = null) {
   } else {
     setPreview(null);
     showCropButton(false);
-    form.type.value = type || (new Date().getHours() < 12 ? 'sunrise' : 'sunset');
+    form.type.value = type || guessType(new Date());
     touched.type = !!type;
     form.date.value = todayIso();
     form.mood.value = 'plain';
@@ -702,7 +714,7 @@ function fillView(sky) {
   const img = fig.querySelector('img');
   img.src = photoUrl(sky);
   img.alt = `${sky.type}: ${displayTitle(sky)}`;
-  $('#viewType').textContent = `${sky.type === 'sunrise' ? '☀ sunrise' : '☾ sunset'} · ${longDate(sky.date)}`;
+  $('#viewType').textContent = `${TYPE_ICONS[sky.type] || ''} ${sky.type} · ${longDate(sky.date)}`;
   $('#viewTitle').textContent = displayTitle(sky);
   $('#viewMeta').textContent = [sky.location, sky.mood && `${sky.mood} sky`].filter(Boolean).join(' · ');
   $('#viewNote').textContent = sky.note ? `“${sky.note}”` : '';
@@ -794,7 +806,7 @@ $('#importInput').addEventListener('change', async e => {
     if (!Array.isArray(data.skies)) throw new Error('no skies in file');
     const incoming = data.skies
       .filter(s => s && typeof s.id === 'string'
-        && (s.type === 'sunrise' || s.type === 'sunset')
+        && TYPES.includes(s.type)
         && /^\d{4}-\d{2}-\d{2}$/.test(s.date)
         && typeof s.photo === 'string' && s.photo.startsWith('data:image/'))
       .map(s => ({
@@ -959,7 +971,7 @@ function updateSky() {
 
   $('#todayLine').textContent = line;
   $('#todayRise').textContent = `☀ ${fmtTime(rise)}`;
-  $('#todaySet').textContent = `☾ ${fmtTime(set)}`;
+  $('#todaySet').textContent = `${TYPE_ICONS.sunset} ${fmtTime(set)}`;
   $('#todayPlace').textContent = place.name;
 }
 

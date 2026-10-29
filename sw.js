@@ -1,7 +1,7 @@
 // Offline support: the app files are cached on install, so the wall opens
 // without internet. Your skies themselves live in IndexedDB, not here.
 // Bump VERSION whenever index.html / style.css / script.js change.
-const VERSION = 'sky-wall-v4';
+const VERSION = 'sky-wall-v5';
 const FONT_CACHE = 'sky-wall-fonts';
 const APP_FILES = [
   './',
